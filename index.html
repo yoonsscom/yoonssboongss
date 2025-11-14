@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="붕어빵 가게 정보를 쉽게 찾아보세요">
+    <title>윤쓰의 광안리 붕세권 - 붕어빵 가게 찾기</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="logo">🍞 윤쓰붕쓰 강알리붕세권</h1>
+            <button class="btn-current-location" id="btnCurrentLocation" title="현재 위치">
+                📍
+            </button>
+        </div>
+    </header>
+
+    <!-- 검색 바 -->
+    <div class="search-bar">
+        <input type="text" 
+               id="searchInput" 
+               class="search-input" 
+               placeholder="지역명 또는 가게명 검색"
+               autocomplete="off">
+        <button class="btn-search" id="btnSearch">🔍</button>
+    </div>
+
+    <!-- 탭 버튼 -->
+    <div class="tabs">
+        <button class="tab-btn active" id="tabMap">지도</button>
+        <button class="tab-btn" id="tabList">목록</button>
+    </div>
+
+    <!-- 지도 컨테이너 -->
+    <div id="mapContainer" class="map-container active">
+        <div id="map" class="map"></div>
+    </div>
+
+    <!-- 목록 컨테이너 -->
+    <div id="listContainer" class="list-container">
+        <div class="list-header">
+            <span id="storeCount">총 0개</span>
+            <select id="sortSelect" class="sort-select">
+                <option value="distance">거리순</option>
+                <option value="name">이름순</option>
+            </select>
+        </div>
+        <div id="storeList" class="store-list">
+            <!-- 가게 목록이 여기에 동적으로 추가됩니다 -->
+        </div>
+    </div>
+
+    <!-- 가게 상세 모달 -->
+    <div id="storeModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">×</button>
+            <div id="modalBody">
+                <!-- 가게 상세 정보가 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 로딩 인디케이터 -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 네이버 지도 API 스크립트 -->
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=9ajf9p6dfh"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
