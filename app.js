@@ -205,6 +205,11 @@ function showStoreOnMap(storeId) {
     }, 300);
 }
 
+// 모바일 기기 감지
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 // 네이버 지도 길찾기 열기
 function openNavigation(storeId) {
     const store = stores.find(s => s.id === storeId);
@@ -227,8 +232,14 @@ function openNavigation(storeId) {
     // 형식: https://map.naver.com/p/directions/-/경도,위도,주소,,ADDRESS_POI/-/transit?c=15.00,0,0,0,dh
     const navUrl = `https://map.naver.com/p/directions/-/${endParam}/-/transit?c=15.00,0,0,0,dh`;
     
-    // 새 창에서 열기
-    window.open(navUrl, '_blank');
+    // 모바일에서는 현재 창에서 열기, 데스크톱에서는 새 창에서 열기
+    if (isMobile()) {
+        // 모바일: 현재 창에서 이동 (팝업 차단 방지)
+        window.location.href = navUrl;
+    } else {
+        // 데스크톱: 새 창에서 열기
+        window.open(navUrl, '_blank');
+    }
 }
 
 // 거리 계산 (Haversine 공식)
