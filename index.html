@@ -68,8 +68,40 @@
         <div class="spinner"></div>
     </div>
 
-    <!-- 네이버 지도 API 스크립트 -->
-    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=9ajf9p6dfh"></script>
+    <!-- 설정 파일 로드 -->
+    <script src="config.js"></script>
+    <!-- 네이버 지도 API 스크립트 (동적으로 로드) -->
+    <script>
+        // 네이버 지도 API 로드
+        function loadNaverMapAPI() {
+            // config.js에서 API 키 가져오기
+            const apiKey = (typeof CONFIG !== 'undefined' && CONFIG.NAVER_MAP_API_KEY) 
+                ? CONFIG.NAVER_MAP_API_KEY 
+                : '';
+            
+            if (!apiKey || apiKey === 'YOUR_API_KEY_HERE' || apiKey.trim() === '') {
+                console.error('네이버 지도 API 키가 설정되지 않았습니다. config.js 파일을 확인해주세요.');
+                alert('네이버 지도 API 키가 설정되지 않았습니다.\n\nconfig.js 파일에 API 키를 설정해주세요.');
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${apiKey}`;
+            script.onerror = function() {
+                console.error('네이버 지도 API를 불러오는데 실패했습니다.');
+                alert('네이버 지도 API를 불러오는데 실패했습니다.\n\n가능한 원인:\n1. API 키가 잘못되었습니다\n2. Web 서비스 URL이 등록되지 않았습니다\n3. 네트워크 연결을 확인해주세요');
+            };
+            document.head.appendChild(script);
+        }
+        
+        // 페이지 로드 시 API 로드
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadNaverMapAPI);
+        } else {
+            loadNaverMapAPI();
+        }
+    </script>
     <script src="data.js"></script>
     <script src="app.js"></script>
 </body>

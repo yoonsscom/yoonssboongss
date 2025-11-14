@@ -14,13 +14,40 @@
 
 ### 2. API 키 설정
 
-`index.html` 파일을 열고 다음 줄을 찾아주세요:
+#### 로컬 개발용 (선택사항)
 
-```html
-<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=YOUR_CLIENT_ID"></script>
-```
+1. `config.js.example` 파일을 복사하여 `config.js` 파일 생성:
+   ```bash
+   cp config.js.example config.js
+   ```
 
-`YOUR_CLIENT_ID`를 발급받은 Client ID로 변경해주세요.
+2. `config.js` 파일을 열고 실제 API 키 입력:
+   ```javascript
+   const CONFIG = {
+       NAVER_MAP_API_KEY: 'YOUR_API_KEY_HERE'  // 여기에 실제 API 키 입력
+   };
+   ```
+
+**⚠️ 주의**: `config.js` 파일은 `.gitignore`에 포함되어 있어 GitHub에 업로드되지 않습니다.
+
+#### GitHub Pages 배포용
+
+1. **네이버 클라우드 플랫폼에서 도메인 제한 설정** (필수!)
+   - 네이버 클라우드 플랫폼 콘솔 접속
+   - AI·NAVER API > Application 메뉴
+   - 해당 Application 선택
+   - "Web 서비스 URL"에 GitHub Pages URL 등록
+   - 예: `https://yourusername.github.io` 또는 `https://yourusername.github.io/repository-name`
+
+2. **GitHub에 코드 푸시**
+   - `config.js` 파일도 함께 업로드됨
+   - 도메인 제한으로 보안 유지
+
+3. **사용자 경험**
+   - 사용자는 API 키 입력 없이 바로 사용 가능
+   - 자동으로 지도가 로드됨
+
+**⚠️ 중요**: 도메인 제한을 설정하지 않으면 다른 사람이 API 키를 복사하여 사용할 수 있습니다. 반드시 네이버 클라우드 플랫폼에서 Web 서비스 URL 제한을 설정하세요!
 
 ### 3. 실행
 
