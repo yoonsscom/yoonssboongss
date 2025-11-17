@@ -69,6 +69,30 @@
         <div class="spinner"></div>
     </div>
 
+    <!-- 비밀번호 입력 모달 -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content password-modal">
+            <button class="modal-close" id="passwordClose">×</button>
+            <h2>🔒 관리자 모드</h2>
+            <p style="margin-bottom: 20px; color: #666;">비밀번호를 입력하세요</p>
+            <form id="passwordForm">
+                <div class="form-group">
+                    <input type="password" 
+                           id="passwordInput" 
+                           class="password-input" 
+                           placeholder="비밀번호 입력"
+                           autocomplete="off"
+                           required
+                           autofocus>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-save">확인</button>
+                    <button type="button" class="btn-cancel" id="passwordCancel">취소</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- 관리자 모드 UI -->
     <div id="adminPanel" class="admin-panel hidden">
         <div class="admin-header">

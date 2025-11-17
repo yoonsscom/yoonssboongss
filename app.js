@@ -30,6 +30,11 @@ const modalBody = document.getElementById('modalBody');
 const loading = document.getElementById('loading');
 
 // 관리자 모드 DOM 요소
+const passwordModal = document.getElementById('passwordModal');
+const passwordClose = document.getElementById('passwordClose');
+const passwordForm = document.getElementById('passwordForm');
+const passwordInput = document.getElementById('passwordInput');
+const passwordCancel = document.getElementById('passwordCancel');
 const adminPanel = document.getElementById('adminPanel');
 const adminClose = document.getElementById('adminClose');
 const btnAddStore = document.getElementById('btnAddStore');
@@ -45,6 +50,9 @@ const btnAddMenu = document.getElementById('btnAddMenu');
 const menuList = document.getElementById('menuList');
 const btnCancelEdit = document.getElementById('btnCancelEdit');
 const logo = document.querySelector('.logo');
+
+// 관리자 비밀번호
+const ADMIN_PASSWORD = '7777';
 
 // LocalStorage에서 가게 데이터 로드
 function loadStoresFromLocalStorage() {
@@ -601,23 +609,48 @@ if (logo) {
         
         logoClickTimer = setTimeout(() => {
             if (logoClickCount >= 3) {
-                toggleAdminMode();
+                showPasswordModal();
             }
             logoClickCount = 0;
         }, 1000);
     });
 }
 
-// 관리자 모드 토글
-function toggleAdminMode() {
-    isAdminMode = !isAdminMode;
-    if (isAdminMode) {
+// 비밀번호 입력 모달 표시
+function showPasswordModal() {
+    if (passwordModal) {
+        passwordModal.classList.add('active');
+        if (passwordInput) {
+            passwordInput.focus();
+            passwordInput.value = '';
+        }
+    }
+}
+
+// 비밀번호 확인
+function checkPassword(password) {
+    return password === ADMIN_PASSWORD;
+}
+
+// 관리자 모드 열기
+function openAdminMode() {
+    isAdminMode = true;
+    if (passwordModal) {
+        passwordModal.classList.remove('active');
+    }
+    if (adminPanel) {
         adminPanel.classList.remove('hidden');
         updateAdminStoresList();
-    } else {
-        adminPanel.classList.add('hidden');
-        exitMapCoordinateMode();
     }
+}
+
+// 관리자 모드 닫기
+function closeAdminMode() {
+    isAdminMode = false;
+    if (adminPanel) {
+        adminPanel.classList.add('hidden');
+    }
+    exitMapCoordinateMode();
 }
 
 // 관리자 가게 목록 업데이트
@@ -848,10 +881,61 @@ storeModal.addEventListener('click', (e) => {
     }
 });
 
+// 비밀번호 모달 이벤트 리스너
+if (passwordForm) {
+    passwordForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const password = passwordInput ? passwordInput.value.trim() : '';
+        
+        if (checkPassword(password)) {
+            openAdminMode();
+        } else {
+            alert('비밀번호가 올바르지 않습니다.');
+            if (passwordInput) {
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        }
+    });
+}
+
+if (passwordClose) {
+    passwordClose.addEventListener('click', () => {
+        if (passwordModal) {
+            passwordModal.classList.remove('active');
+        }
+        if (passwordInput) {
+            passwordInput.value = '';
+        }
+    });
+}
+
+if (passwordCancel) {
+    passwordCancel.addEventListener('click', () => {
+        if (passwordModal) {
+            passwordModal.classList.remove('active');
+        }
+        if (passwordInput) {
+            passwordInput.value = '';
+        }
+    });
+}
+
+if (passwordModal) {
+    passwordModal.addEventListener('click', (e) => {
+        if (e.target === passwordModal) {
+            passwordModal.classList.remove('active');
+            if (passwordInput) {
+                passwordInput.value = '';
+            }
+        }
+    });
+}
+
 // 관리자 모드 이벤트 리스너
 if (adminClose) {
     adminClose.addEventListener('click', () => {
-        toggleAdminMode();
+        closeAdminMode();
     });
 }
 

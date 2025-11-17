@@ -728,6 +728,28 @@ body {
     background: #777;
 }
 
+/* 비밀번호 입력 모달 */
+.password-modal {
+    max-width: 400px;
+}
+
+.password-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 18px;
+    text-align: center;
+    letter-spacing: 4px;
+    outline: none;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+
+.password-input:focus {
+    border-color: #667eea;
+}
+
 /* 지도 좌표 선택 모드 */
 .map-coordinate-mode {
     position: absolute;
