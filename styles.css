@@ -38,16 +38,30 @@ body {
     background: rgba(255,255,255,0.2);
     border: none;
     color: white;
-    font-size: 20px;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 20px;
     cursor: pointer;
     transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
 }
 
 .btn-current-location:hover {
     background: rgba(255,255,255,0.3);
+}
+
+.btn-current-location .btn-icon {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.btn-current-location .btn-text {
+    font-size: 14px;
 }
 
 .btn-current-location:active {
@@ -432,6 +446,20 @@ body {
     
     .store-name {
         font-size: 16px;
+    }
+    
+    .btn-current-location {
+        padding: 6px 10px;
+        font-size: 12px;
+        gap: 4px;
+    }
+    
+    .btn-current-location .btn-icon {
+        font-size: 14px;
+    }
+    
+    .btn-current-location .btn-text {
+        font-size: 12px;
     }
 }
 
