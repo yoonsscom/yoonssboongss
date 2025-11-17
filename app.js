@@ -79,10 +79,25 @@ function loadAllStores() {
         ? Math.max(...defaultStores.map(s => s.id || 0))
         : 0;
     
-    const adjustedCustomStores = customStores.map((store, index) => ({
-        ...store,
-        id: store.id >= 10000 ? store.id : maxDefaultId + 10000 + index
-    }));
+    // Custom stores 중 이미 10000 이상인 ID의 최대값 찾기
+    const maxCustomId = customStores.length > 0
+        ? Math.max(...customStores.map(s => (s.id >= 10000 ? s.id : 0)), 0)
+        : 0;
+    
+    // 시작 ID는 기본 데이터 최대값과 커스텀 데이터 최대값 중 큰 값 + 10000
+    let nextId = Math.max(maxDefaultId, maxCustomId) + 10000;
+    
+    const adjustedCustomStores = customStores.map((store) => {
+        // 이미 10000 이상인 ID는 그대로 사용
+        if (store.id >= 10000) {
+            return store;
+        }
+        // 그렇지 않으면 새 ID 할당
+        return {
+            ...store,
+            id: nextId++
+        };
+    });
     
     allStores = [...defaultStores, ...adjustedCustomStores];
     filteredStores = [...allStores];
@@ -240,27 +255,45 @@ function createStoreCard(store) {
 
 // 가게 상세 정보 표시
 function showStoreDetail(store) {
-    const menuHtml = store.menu.map(item => `
-        <div class="menu-item">
-            <span class="menu-name">${item.name}</span>
-            <span class="menu-price">${item.price.toLocaleString()}원</span>
-        </div>
-    `).join('');
+    // 메뉴 HTML 생성 (메뉴가 없을 경우 처리)
+    const menuItems = Array.isArray(store.menu) && store.menu.length > 0 
+        ? store.menu 
+        : [];
+    const menuHtml = menuItems.length > 0
+        ? menuItems.map(item => `
+            <div class="menu-item">
+                <span class="menu-name">${item.name || ''}</span>
+                <span class="menu-price">${(item.price || 0).toLocaleString()}원</span>
+            </div>
+        `).join('')
+        : '<div style="text-align: center; padding: 20px; color: #999;">메뉴 정보가 없습니다.</div>';
+    
+    // 영업시간 처리
+    const hoursText = (store.hours && store.hours.open && store.hours.close)
+        ? `${store.hours.open} - ${store.hours.close}`
+        : (store.hours && store.hours.open) 
+            ? store.hours.open
+            : '영업시간 정보 없음';
+    
+    // 전화번호 처리
+    const phoneText = store.phone && store.phone.trim() 
+        ? store.phone 
+        : '전화번호 없음';
     
     modalBody.innerHTML = `
-        <img src="${store.image}" alt="${store.name}" class="store-detail-image" onerror="this.src='https://via.placeholder.com/400x200?text=이미지'">
-        <div class="store-detail-name">${store.name}</div>
+        <img src="${store.image || 'https://via.placeholder.com/400x200?text=이미지'}" alt="${store.name}" class="store-detail-image" onerror="this.src='https://via.placeholder.com/400x200?text=이미지'">
+        <div class="store-detail-name">${store.name || '가게명 없음'}</div>
         <div class="store-detail-info">
             <span class="store-detail-info-icon">📍</span>
-            <span>${store.address}</span>
+            <span>${store.address || '주소 없음'}</span>
         </div>
         <div class="store-detail-info">
             <span class="store-detail-info-icon">📞</span>
-            <span>${store.phone}</span>
+            <span>${phoneText}</span>
         </div>
         <div class="store-detail-info">
             <span class="store-detail-info-icon">🕐</span>
-            <span>영업시간: ${store.hours.open} - ${store.hours.close}</span>
+            <span>영업시간: ${hoursText}</span>
         </div>
         <div class="store-detail-section">
             <div class="store-detail-section-title">메뉴</div>
@@ -681,7 +714,7 @@ function saveStore(storeData) {
     } else {
         // 추가
         const maxId = customStores.length > 0 
-            ? Math.max(...customStores.map(s => s.id || 0))
+            ? Math.max(...customStores.map(s => (s.id >= 10000 ? s.id : 0)), 10000)
             : 10000;
         storeData.id = maxId + 1;
         customStores.push(storeData);
@@ -768,6 +801,8 @@ function importData() {
 // 전역 함수로 등록 (HTML에서 onclick 사용)
 window.editStore = editStore;
 window.deleteStore = deleteStore;
+window.showStoreOnMap = showStoreOnMap;
+window.openNavigation = openNavigation;
 
 // ==================== 이벤트 리스너 ====================
 
