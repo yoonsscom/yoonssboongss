@@ -1,11 +1,17 @@
 // 전역 변수
 let map;
 let markers = [];
-let filteredStores = [...stores];
+let allStores = []; // data.js + LocalStorage 통합 데이터
+let filteredStores = [];
 let currentPosition = null;
 let currentLocationMarker = null; // 현재 위치 마커
 let watchPositionId = null; // 위치 추적 ID (중지 시 사용)
 let isTrackingLocation = false; // 위치 추적 중인지 여부
+
+// 관리자 모드 변수
+let isAdminMode = false;
+let isMapCoordinateMode = false; // 지도 좌표 선택 모드
+let coordinateModeMarker = null; // 좌표 선택 마커
 
 // DOM 요소
 const searchInput = document.getElementById('searchInput');
@@ -23,9 +29,70 @@ const modalClose = document.getElementById('modalClose');
 const modalBody = document.getElementById('modalBody');
 const loading = document.getElementById('loading');
 
+// 관리자 모드 DOM 요소
+const adminPanel = document.getElementById('adminPanel');
+const adminClose = document.getElementById('adminClose');
+const btnAddStore = document.getElementById('btnAddStore');
+const btnExportData = document.getElementById('btnExportData');
+const btnImportData = document.getElementById('btnImportData');
+const fileInput = document.getElementById('fileInput');
+const adminStoresList = document.getElementById('adminStoresList');
+const storeEditModal = document.getElementById('storeEditModal');
+const storeEditClose = document.getElementById('storeEditClose');
+const storeEditForm = document.getElementById('storeEditForm');
+const btnMapSelect = document.getElementById('btnMapSelect');
+const btnAddMenu = document.getElementById('btnAddMenu');
+const menuList = document.getElementById('menuList');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
+const logo = document.querySelector('.logo');
+
+// LocalStorage에서 가게 데이터 로드
+function loadStoresFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('bongssStores');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.error('LocalStorage 로드 오류:', e);
+        return [];
+    }
+}
+
+// LocalStorage에 가게 데이터 저장
+function saveStoresToLocalStorage(customStores) {
+    try {
+        localStorage.setItem('bongssStores', JSON.stringify(customStores));
+        return true;
+    } catch (e) {
+        console.error('LocalStorage 저장 오류:', e);
+        alert('데이터 저장에 실패했습니다.');
+        return false;
+    }
+}
+
+// data.js와 LocalStorage 데이터 통합
+function loadAllStores() {
+    const defaultStores = typeof stores !== 'undefined' ? stores : [];
+    const customStores = loadStoresFromLocalStorage();
+    
+    // ID 충돌 방지: LocalStorage 데이터는 10000 이상 ID 사용
+    const maxDefaultId = defaultStores.length > 0 
+        ? Math.max(...defaultStores.map(s => s.id || 0))
+        : 0;
+    
+    const adjustedCustomStores = customStores.map((store, index) => ({
+        ...store,
+        id: store.id >= 10000 ? store.id : maxDefaultId + 10000 + index
+    }));
+    
+    allStores = [...defaultStores, ...adjustedCustomStores];
+    filteredStores = [...allStores];
+    
+    return allStores;
+}
+
 // 등록된 가게들의 중심점 계산
 function calculateStoresCenter() {
-    if (stores.length === 0) {
+    if (allStores.length === 0) {
         // 가게가 없으면 기본 위치 (서울시청)
         return new naver.maps.LatLng(37.5665, 126.9780);
     }
@@ -34,13 +101,13 @@ function calculateStoresCenter() {
     let sumLat = 0;
     let sumLng = 0;
     
-    stores.forEach(store => {
+    allStores.forEach(store => {
         sumLat += store.lat;
         sumLng += store.lng;
     });
     
-    const avgLat = sumLat / stores.length;
-    const avgLng = sumLng / stores.length;
+    const avgLat = sumLat / allStores.length;
+    const avgLng = sumLng / allStores.length;
     
     return new naver.maps.LatLng(avgLat, avgLng);
 }
@@ -52,7 +119,7 @@ function initMap() {
     
     const mapOptions = {
         center: centerPosition,
-        zoom: stores.length === 1 ? 15 : 13, // 가게가 1개면 더 확대
+        zoom: allStores.length === 1 ? 15 : 13, // 가게가 1개면 더 확대
         zoomControl: true,
         zoomControlOptions: {
             position: naver.maps.Position.TOP_RIGHT
@@ -60,6 +127,35 @@ function initMap() {
     };
     
     map = new naver.maps.Map('map', mapOptions);
+    
+    // 지도 클릭 이벤트 (좌표 선택 모드일 때)
+    naver.maps.Event.addListener(map, 'click', (e) => {
+        if (isMapCoordinateMode) {
+            const lat = e.coord.lat();
+            const lng = e.coord.lng();
+            
+            document.getElementById('editStoreLat').value = lat.toFixed(6);
+            document.getElementById('editStoreLng').value = lng.toFixed(6);
+            
+            // 마커 표시
+            if (coordinateModeMarker) {
+                coordinateModeMarker.setPosition(e.coord);
+            } else {
+                coordinateModeMarker = new naver.maps.Marker({
+                    position: e.coord,
+                    map: map,
+                    icon: {
+                        content: '<div style="width: 20px; height: 20px; background: #4CAF50; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                        anchor: new naver.maps.Point(10, 10)
+                    },
+                    zIndex: 2000
+                });
+            }
+            
+            // 좌표 선택 모드 종료
+            exitMapCoordinateMode();
+        }
+    });
     
     // 가게 마커 표시
     displayStoresOnMap();
@@ -181,7 +277,7 @@ function showStoreDetail(store) {
 
 // 지도에서 가게 보기
 function showStoreOnMap(storeId) {
-    const store = stores.find(s => s.id === storeId);
+    const store = allStores.find(s => s.id === storeId);
     if (!store) return;
     
     // 모달 닫기
@@ -215,7 +311,7 @@ function isMobile() {
 
 // 네이버 지도 길찾기 열기
 function openNavigation(storeId) {
-    const store = stores.find(s => s.id === storeId);
+    const store = allStores.find(s => s.id === storeId);
     if (!store) return;
     
     // 네이버 지도 길찾기 URL 형식: /p/directions/출발지/도착지/-/transit
@@ -261,10 +357,10 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 // 검색 기능
 function searchStores(query) {
     if (!query || query.trim() === '') {
-        filteredStores = [...stores];
+        filteredStores = [...allStores];
     } else {
         const lowerQuery = query.toLowerCase();
-        filteredStores = stores.filter(store => 
+        filteredStores = allStores.filter(store => 
             store.name.toLowerCase().includes(lowerQuery) ||
             store.address.toLowerCase().includes(lowerQuery)
         );
@@ -456,6 +552,225 @@ function getCurrentLocation() {
     );
 }
 
+// ==================== 관리자 모드 기능 ====================
+
+// 관리자 모드 토글 (로고 3번 클릭)
+let logoClickCount = 0;
+let logoClickTimer = null;
+
+if (logo) {
+    logo.addEventListener('click', () => {
+        logoClickCount++;
+        
+        if (logoClickTimer) {
+            clearTimeout(logoClickTimer);
+        }
+        
+        logoClickTimer = setTimeout(() => {
+            if (logoClickCount >= 3) {
+                toggleAdminMode();
+            }
+            logoClickCount = 0;
+        }, 1000);
+    });
+}
+
+// 관리자 모드 토글
+function toggleAdminMode() {
+    isAdminMode = !isAdminMode;
+    if (isAdminMode) {
+        adminPanel.classList.remove('hidden');
+        updateAdminStoresList();
+    } else {
+        adminPanel.classList.add('hidden');
+        exitMapCoordinateMode();
+    }
+}
+
+// 관리자 가게 목록 업데이트
+function updateAdminStoresList() {
+    const customStores = loadStoresFromLocalStorage();
+    adminStoresList.innerHTML = '';
+    
+    if (customStores.length === 0) {
+        adminStoresList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">추가된 가게가 없습니다.</div>';
+        return;
+    }
+    
+    customStores.forEach(store => {
+        const item = document.createElement('div');
+        item.className = 'admin-store-item';
+        item.innerHTML = `
+            <div class="admin-store-info">
+                <div class="store-name">${store.name}</div>
+                <div class="store-address">${store.address}</div>
+            </div>
+            <div class="admin-store-actions">
+                <button class="btn-edit" onclick="editStore(${store.id})">✏️ 수정</button>
+                <button class="btn-delete" onclick="deleteStore(${store.id})">🗑️ 삭제</button>
+            </div>
+        `;
+        adminStoresList.appendChild(item);
+    });
+}
+
+// 가게 추가
+function addStore() {
+    document.getElementById('storeEditTitle').textContent = '가게 추가';
+    document.getElementById('editStoreId').value = '';
+    document.getElementById('storeEditForm').reset();
+    menuList.innerHTML = '';
+    storeEditModal.classList.add('active');
+}
+
+// 가게 수정
+function editStore(storeId) {
+    const customStores = loadStoresFromLocalStorage();
+    const store = customStores.find(s => s.id === storeId);
+    if (!store) return;
+    
+    document.getElementById('storeEditTitle').textContent = '가게 수정';
+    document.getElementById('editStoreId').value = store.id;
+    document.getElementById('editStoreName').value = store.name;
+    document.getElementById('editStoreAddress').value = store.address;
+    document.getElementById('editStorePhone').value = store.phone || '';
+    document.getElementById('editStoreOpen').value = store.hours?.open || '';
+    document.getElementById('editStoreClose').value = store.hours?.close || '';
+    document.getElementById('editStoreLat').value = store.lat;
+    document.getElementById('editStoreLng').value = store.lng;
+    document.getElementById('editStoreImage').value = store.image || '';
+    
+    // 메뉴 목록
+    menuList.innerHTML = '';
+    if (store.menu && store.menu.length > 0) {
+        store.menu.forEach((menu, index) => {
+            addMenuItem(menu.name, menu.price);
+        });
+    }
+    
+    storeEditModal.classList.add('active');
+}
+
+// 가게 삭제
+function deleteStore(storeId) {
+    if (!confirm('정말 이 가게를 삭제하시겠습니까?')) return;
+    
+    const customStores = loadStoresFromLocalStorage();
+    const filtered = customStores.filter(s => s.id !== storeId);
+    
+    if (saveStoresToLocalStorage(filtered)) {
+        loadAllStores();
+        displayStoresOnMap();
+        updateStoreList();
+        updateAdminStoresList();
+        alert('가게가 삭제되었습니다.');
+    }
+}
+
+// 가게 저장
+function saveStore(storeData) {
+    const customStores = loadStoresFromLocalStorage();
+    const storeId = parseInt(document.getElementById('editStoreId').value);
+    
+    if (storeId && storeId > 0) {
+        // 수정
+        const index = customStores.findIndex(s => s.id === storeId);
+        if (index !== -1) {
+            customStores[index] = storeData;
+        }
+    } else {
+        // 추가
+        const maxId = customStores.length > 0 
+            ? Math.max(...customStores.map(s => s.id || 0))
+            : 10000;
+        storeData.id = maxId + 1;
+        customStores.push(storeData);
+    }
+    
+    if (saveStoresToLocalStorage(customStores)) {
+        loadAllStores();
+        displayStoresOnMap();
+        updateStoreList();
+        updateAdminStoresList();
+        storeEditModal.classList.remove('active');
+        alert(storeId ? '가게가 수정되었습니다.' : '가게가 추가되었습니다.');
+    }
+}
+
+// 지도 좌표 선택 모드 시작
+function startMapCoordinateMode() {
+    isMapCoordinateMode = true;
+    storeEditModal.classList.remove('active');
+    
+    // 지도 탭으로 전환
+    tabMap.click();
+    
+    // 안내 메시지 표시
+    const notice = document.createElement('div');
+    notice.className = 'map-coordinate-mode';
+    notice.id = 'coordinateModeNotice';
+    notice.textContent = '📍 지도를 클릭하여 좌표를 선택하세요';
+    mapContainer.appendChild(notice);
+    
+    // 좌표 선택 마커 제거
+    if (coordinateModeMarker) {
+        coordinateModeMarker.setMap(null);
+        coordinateModeMarker = null;
+    }
+}
+
+// 지도 좌표 선택 모드 종료
+function exitMapCoordinateMode() {
+    isMapCoordinateMode = false;
+    const notice = document.getElementById('coordinateModeNotice');
+    if (notice) {
+        notice.remove();
+    }
+    
+    // 편집 모달 다시 표시
+    if (document.getElementById('editStoreId').value || 
+        document.getElementById('editStoreName').value) {
+        storeEditModal.classList.add('active');
+    }
+}
+
+// 메뉴 항목 추가
+function addMenuItem(name = '', price = 0) {
+    const menuItem = document.createElement('div');
+    menuItem.className = 'menu-item-edit';
+    const menuIndex = menuList.children.length;
+    menuItem.innerHTML = `
+        <input type="text" class="menu-name-input" placeholder="메뉴명" value="${name}">
+        <input type="number" class="menu-price-input" placeholder="가격" value="${price}" min="0">
+        <button type="button" class="btn-remove-menu" onclick="this.parentElement.remove()">삭제</button>
+    `;
+    menuList.appendChild(menuItem);
+}
+
+// JSON 다운로드
+function exportData() {
+    const customStores = loadStoresFromLocalStorage();
+    const dataStr = JSON.stringify(customStores, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bongss-stores-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+// JSON 업로드
+function importData() {
+    fileInput.click();
+}
+
+// 전역 함수로 등록 (HTML에서 onclick 사용)
+window.editStore = editStore;
+window.deleteStore = deleteStore;
+
+// ==================== 이벤트 리스너 ====================
+
 // 이벤트 리스너
 btnSearch.addEventListener('click', () => {
     searchStores(searchInput.value);
@@ -498,8 +813,130 @@ storeModal.addEventListener('click', (e) => {
     }
 });
 
+// 관리자 모드 이벤트 리스너
+if (adminClose) {
+    adminClose.addEventListener('click', () => {
+        toggleAdminMode();
+    });
+}
+
+if (btnAddStore) {
+    btnAddStore.addEventListener('click', addStore);
+}
+
+if (btnExportData) {
+    btnExportData.addEventListener('click', exportData);
+}
+
+if (btnImportData) {
+    btnImportData.addEventListener('click', importData);
+}
+
+if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (Array.isArray(data)) {
+                    if (confirm(`${data.length}개의 가게를 가져오시겠습니까?`)) {
+                        saveStoresToLocalStorage(data);
+                        loadAllStores();
+                        displayStoresOnMap();
+                        updateStoreList();
+                        updateAdminStoresList();
+                        alert('데이터를 가져왔습니다.');
+                    }
+                } else {
+                    alert('올바른 JSON 형식이 아닙니다.');
+                }
+            } catch (error) {
+                alert('파일을 읽는 중 오류가 발생했습니다.');
+                console.error(error);
+            }
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+    });
+}
+
+if (storeEditClose) {
+    storeEditClose.addEventListener('click', () => {
+        storeEditModal.classList.remove('active');
+        exitMapCoordinateMode();
+    });
+}
+
+if (btnCancelEdit) {
+    btnCancelEdit.addEventListener('click', () => {
+        storeEditModal.classList.remove('active');
+        exitMapCoordinateMode();
+    });
+}
+
+if (storeEditModal) {
+    storeEditModal.addEventListener('click', (e) => {
+        if (e.target === storeEditModal) {
+            storeEditModal.classList.remove('active');
+            exitMapCoordinateMode();
+        }
+    });
+}
+
+if (storeEditForm) {
+    storeEditForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const menuItems = [];
+        const menuInputs = menuList.querySelectorAll('.menu-item-edit');
+        menuInputs.forEach(item => {
+            const name = item.querySelector('.menu-name-input').value.trim();
+            const price = parseInt(item.querySelector('.menu-price-input').value) || 0;
+            if (name) {
+                menuItems.push({ name, price });
+            }
+        });
+        
+        const storeData = {
+            name: document.getElementById('editStoreName').value.trim(),
+            address: document.getElementById('editStoreAddress').value.trim(),
+            phone: document.getElementById('editStorePhone').value.trim(),
+            lat: parseFloat(document.getElementById('editStoreLat').value),
+            lng: parseFloat(document.getElementById('editStoreLng').value),
+            hours: {
+                open: document.getElementById('editStoreOpen').value.trim(),
+                close: document.getElementById('editStoreClose').value.trim()
+            },
+            menu: menuItems,
+            image: document.getElementById('editStoreImage').value.trim() || 
+                   `https://via.placeholder.com/400x200?text=${encodeURIComponent(document.getElementById('editStoreName').value)}`
+        };
+        
+        if (!storeData.name || !storeData.address || !storeData.lat || !storeData.lng) {
+            alert('필수 항목을 모두 입력해주세요.');
+            return;
+        }
+        
+        saveStore(storeData);
+    });
+}
+
+if (btnMapSelect) {
+    btnMapSelect.addEventListener('click', startMapCoordinateMode);
+}
+
+if (btnAddMenu) {
+    btnAddMenu.addEventListener('click', () => addMenuItem());
+}
+
 // 페이지 로드 시 초기화
 window.addEventListener('load', () => {
+    // 데이터 로드
+    loadAllStores();
+    
     setTimeout(() => {
         if (typeof naver !== 'undefined' && naver.maps) {
             try {
