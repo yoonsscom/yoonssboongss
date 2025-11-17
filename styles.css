@@ -54,6 +54,25 @@ body {
     transform: scale(0.95);
 }
 
+/* 위치 추적 중일 때 스타일 */
+.btn-current-location.tracking {
+    background: rgba(66, 133, 244, 0.8);
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.7);
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(66, 133, 244, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0);
+    }
+}
+
 /* 검색 바 */
 .search-bar {
     display: flex;

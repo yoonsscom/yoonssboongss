@@ -3,6 +3,9 @@ let map;
 let markers = [];
 let filteredStores = [...stores];
 let currentPosition = null;
+let currentLocationMarker = null; // 현재 위치 마커
+let watchPositionId = null; // 위치 추적 ID (중지 시 사용)
+let isTrackingLocation = false; // 위치 추적 중인지 여부
 
 // DOM 요소
 const searchInput = document.getElementById('searchInput');
@@ -300,7 +303,120 @@ function sortStores() {
     }
 }
 
-// 현재 위치 가져오기
+// 현재 위치 마커 표시/업데이트
+function updateCurrentLocationMarker(lat, lng) {
+    const position = new naver.maps.LatLng(lat, lng);
+    
+    if (currentLocationMarker) {
+        // 기존 마커가 있으면 위치만 업데이트
+        currentLocationMarker.setPosition(position);
+    } else {
+        // 새 마커 생성
+        currentLocationMarker = new naver.maps.Marker({
+            position: position,
+            map: map,
+            icon: {
+                content: '<div style="width: 20px; height: 20px; background: #4285F4; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                anchor: new naver.maps.Point(10, 10)
+            },
+            zIndex: 1000 // 다른 마커보다 위에 표시
+        });
+    }
+}
+
+// 위치 추적 중지
+function stopLocationTracking() {
+    if (watchPositionId !== null) {
+        navigator.geolocation.clearWatch(watchPositionId);
+        watchPositionId = null;
+        isTrackingLocation = false;
+        btnCurrentLocation.classList.remove('tracking');
+        btnCurrentLocation.title = '현재 위치';
+    }
+}
+
+// 실시간 위치 추적 시작
+function startLocationTracking() {
+    if (!navigator.geolocation) {
+        alert('이 브라우저는 위치 서비스를 지원하지 않습니다.');
+        return;
+    }
+    
+    if (isTrackingLocation) {
+        // 이미 추적 중이면 중지
+        stopLocationTracking();
+        return;
+    }
+    
+    loading.classList.remove('hidden');
+    isTrackingLocation = true;
+    btnCurrentLocation.classList.add('tracking');
+    btnCurrentLocation.title = '위치 추적 중 (클릭하여 중지)';
+    
+    // 먼저 현재 위치 한 번 가져오기
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            currentPosition = { lat, lng };
+            
+            // 현재 위치 마커 표시
+            updateCurrentLocationMarker(lat, lng);
+            
+            // 지도 중심 이동
+            const mapPosition = new naver.maps.LatLng(lat, lng);
+            map.setCenter(mapPosition);
+            map.setZoom(15);
+            
+            // 목록 업데이트 (거리순 정렬)
+            if (sortSelect.value === 'distance') {
+                sortStores();
+                updateStoreList();
+            }
+            
+            loading.classList.add('hidden');
+            
+            // 실시간 추적 시작
+            watchPositionId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const newLat = position.coords.latitude;
+                    const newLng = position.coords.longitude;
+                    
+                    currentPosition = { lat: newLat, lng: newLng };
+                    
+                    // 마커 위치 업데이트
+                    updateCurrentLocationMarker(newLat, newLng);
+                    
+                    // 목록 업데이트 (거리순 정렬)
+                    if (sortSelect.value === 'distance') {
+                        sortStores();
+                        updateStoreList();
+                    }
+                },
+                (error) => {
+                    console.error('위치 추적 오류:', error);
+                    stopLocationTracking();
+                    alert('위치 추적 중 오류가 발생했습니다.');
+                },
+                {
+                    enableHighAccuracy: true, // 정확도 향상
+                    timeout: 10000,
+                    maximumAge: 0 // 캐시 사용 안 함
+                }
+            );
+        },
+        (error) => {
+            loading.classList.add('hidden');
+            isTrackingLocation = false;
+            btnCurrentLocation.classList.remove('tracking');
+            alert('위치를 가져올 수 없습니다. 위치 권한을 확인해주세요.');
+            console.error('위치 오류:', error);
+        }
+    );
+}
+
+// 현재 위치 가져오기 (한 번만)
 function getCurrentLocation() {
     if (!navigator.geolocation) {
         alert('이 브라우저는 위치 서비스를 지원하지 않습니다.');
@@ -311,16 +427,16 @@ function getCurrentLocation() {
     
     navigator.geolocation.getCurrentPosition(
         (position) => {
-            currentPosition = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            };
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            currentPosition = { lat, lng };
+            
+            // 현재 위치 마커 표시
+            updateCurrentLocationMarker(lat, lng);
             
             // 지도 중심 이동
-            const mapPosition = new naver.maps.LatLng(
-                currentPosition.lat,
-                currentPosition.lng
-            );
+            const mapPosition = new naver.maps.LatLng(lat, lng);
             map.setCenter(mapPosition);
             map.setZoom(15);
             
@@ -351,7 +467,7 @@ searchInput.addEventListener('keypress', (e) => {
     }
 });
 
-btnCurrentLocation.addEventListener('click', getCurrentLocation);
+btnCurrentLocation.addEventListener('click', startLocationTracking);
 
 tabMap.addEventListener('click', () => {
     tabMap.classList.add('active');
