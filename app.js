@@ -288,6 +288,17 @@ function showStoreDetail(store) {
         ? store.phone 
         : '전화번호 없음';
     
+    // 메모 처리
+    const memoText = store.memo && store.memo.trim()
+        ? store.memo
+        : '';
+    const memoHtml = memoText
+        ? `<div class="store-detail-section">
+            <div class="store-detail-section-title">📝 메모</div>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; color: #333; line-height: 1.6; white-space: pre-wrap;">${memoText}</div>
+        </div>`
+        : '';
+    
     modalBody.innerHTML = `
         <img src="${store.image || 'https://via.placeholder.com/400x200?text=이미지'}" alt="${store.name}" class="store-detail-image" onerror="this.src='https://via.placeholder.com/400x200?text=이미지'">
         <div class="store-detail-name">${store.name || '가게명 없음'}</div>
@@ -307,6 +318,7 @@ function showStoreDetail(store) {
             <div class="store-detail-section-title">메뉴</div>
             ${menuHtml}
         </div>
+        ${memoHtml}
         <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button class="btn-map-view" onclick="showStoreOnMap(${store.id})" style="flex: 1;">지도에서 보기</button>
             <button class="btn-navigation" onclick="openNavigation(${store.id})" style="flex: 1; background: #4CAF50;">🚗 길찾기</button>
@@ -685,6 +697,9 @@ function addStore() {
     document.getElementById('storeEditTitle').textContent = '가게 추가';
     document.getElementById('editStoreId').value = '';
     document.getElementById('storeEditForm').reset();
+    if (document.getElementById('editStoreMemo')) {
+        document.getElementById('editStoreMemo').value = '';
+    }
     menuList.innerHTML = '';
     storeEditModal.classList.add('active');
 }
@@ -705,6 +720,7 @@ function editStore(storeId) {
     document.getElementById('editStoreLat').value = store.lat;
     document.getElementById('editStoreLng').value = store.lng;
     document.getElementById('editStoreImage').value = store.image || '';
+    document.getElementById('editStoreMemo').value = store.memo || '';
     
     // 메뉴 목록
     menuList.innerHTML = '';
@@ -1031,7 +1047,8 @@ if (storeEditForm) {
             },
             menu: menuItems,
             image: document.getElementById('editStoreImage').value.trim() || 
-                   `https://via.placeholder.com/400x200?text=${encodeURIComponent(document.getElementById('editStoreName').value)}`
+                   `https://via.placeholder.com/400x200?text=${encodeURIComponent(document.getElementById('editStoreName').value)}`,
+            memo: document.getElementById('editStoreMemo').value.trim() || ''
         };
         
         if (!storeData.name || !storeData.address || !storeData.lat || !storeData.lng) {
