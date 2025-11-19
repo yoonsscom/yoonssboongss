@@ -4,6 +4,11 @@
 // 이렇게 하면 지정된 도메인에서만 API 키가 작동합니다
 
 const CONFIG = {
-    NAVER_MAP_API_KEY: 'YOUR_API_KEY_HERE'
+    NAVER_MAP_API_KEY: 'YOUR_API_KEY_HERE',
+    
+    // Supabase 설정 (선택사항)
+    // Supabase를 사용하려면 아래 정보를 입력하세요
+    SUPABASE_URL: '',  // Supabase 프로젝트 URL
+    SUPABASE_ANON_KEY: ''  // Supabase Anon Key
 };
 

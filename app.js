@@ -1,7 +1,7 @@
 // 전역 변수
 let map;
 let markers = [];
-let allStores = []; // data.js + LocalStorage 통합 데이터
+let allStores = []; // data.js + Supabase/LocalStorage 통합 데이터
 let filteredStores = [];
 let currentPosition = null;
 let currentLocationMarker = null; // 현재 위치 마커
@@ -12,6 +12,22 @@ let isTrackingLocation = false; // 위치 추적 중인지 여부
 let isAdminMode = false;
 let isMapCoordinateMode = false; // 지도 좌표 선택 모드
 let coordinateModeMarker = null; // 좌표 선택 마커
+
+// Supabase 클라이언트 (설정되어 있으면 사용)
+let supabase = null;
+let useSupabase = false;
+
+// Supabase 초기화
+if (typeof CONFIG !== 'undefined' && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+    try {
+        supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        useSupabase = true;
+        console.log('✅ Supabase 연결 성공');
+    } catch (e) {
+        console.error('❌ Supabase 연결 실패:', e);
+        useSupabase = false;
+    }
+}
 
 // DOM 요소
 const searchInput = document.getElementById('searchInput');
@@ -54,6 +70,124 @@ const logo = document.querySelector('.logo');
 // 관리자 비밀번호
 const ADMIN_PASSWORD = '7777';
 
+// ==================== Supabase 함수 ====================
+
+// Supabase에서 가게 데이터 로드
+async function loadStoresFromSupabase() {
+    if (!useSupabase || !supabase) {
+        return [];
+    }
+    
+    try {
+        const { data, error } = await supabase
+            .from('stores')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            console.error('Supabase 로드 오류:', error);
+            return [];
+        }
+        
+        // Supabase 데이터를 기존 형식으로 변환
+        return (data || []).map(store => ({
+            id: store.id,
+            name: store.name,
+            address: store.address,
+            phone: store.phone || '',
+            lat: store.lat,
+            lng: store.lng,
+            hours: store.hours || { open: '', close: '' },
+            menu: store.menu || [],
+            image: store.image || '',
+            memo: store.memo || ''
+        }));
+    } catch (e) {
+        console.error('Supabase 로드 오류:', e);
+        return [];
+    }
+}
+
+// Supabase에 가게 데이터 저장
+async function saveStoreToSupabase(storeData) {
+    if (!useSupabase || !supabase) {
+        return false;
+    }
+    
+    try {
+        const { data, error } = await supabase
+            .from('stores')
+            .insert([storeData])
+            .select();
+        
+        if (error) {
+            console.error('Supabase 저장 오류:', error);
+            alert('데이터 저장에 실패했습니다: ' + error.message);
+            return false;
+        }
+        
+        return true;
+    } catch (e) {
+        console.error('Supabase 저장 오류:', e);
+        alert('데이터 저장에 실패했습니다.');
+        return false;
+    }
+}
+
+// Supabase에서 가게 수정
+async function updateStoreInSupabase(storeId, storeData) {
+    if (!useSupabase || !supabase) {
+        return false;
+    }
+    
+    try {
+        const { error } = await supabase
+            .from('stores')
+            .update(storeData)
+            .eq('id', storeId);
+        
+        if (error) {
+            console.error('Supabase 수정 오류:', error);
+            alert('데이터 수정에 실패했습니다: ' + error.message);
+            return false;
+        }
+        
+        return true;
+    } catch (e) {
+        console.error('Supabase 수정 오류:', e);
+        alert('데이터 수정에 실패했습니다.');
+        return false;
+    }
+}
+
+// Supabase에서 가게 삭제
+async function deleteStoreFromSupabase(storeId) {
+    if (!useSupabase || !supabase) {
+        return false;
+    }
+    
+    try {
+        const { error } = await supabase
+            .from('stores')
+            .delete()
+            .eq('id', storeId);
+        
+        if (error) {
+            console.error('Supabase 삭제 오류:', error);
+            alert('데이터 삭제에 실패했습니다: ' + error.message);
+            return false;
+        }
+        
+        return true;
+    } catch (e) {
+        console.error('Supabase 삭제 오류:', e);
+        alert('데이터 삭제에 실패했습니다.');
+        return false;
+    }
+}
+
+// ==================== LocalStorage 함수 (백업용) ====================
+
 // LocalStorage에서 가게 데이터 로드
 function loadStoresFromLocalStorage() {
     try {
@@ -77,37 +211,45 @@ function saveStoresToLocalStorage(customStores) {
     }
 }
 
-// data.js와 LocalStorage 데이터 통합
-function loadAllStores() {
+// data.js와 Supabase/LocalStorage 데이터 통합
+async function loadAllStores() {
     const defaultStores = typeof stores !== 'undefined' ? stores : [];
-    const customStores = loadStoresFromLocalStorage();
+    let customStores = [];
     
-    // ID 충돌 방지: LocalStorage 데이터는 10000 이상 ID 사용
+    // Supabase 사용 시
+    if (useSupabase) {
+        customStores = await loadStoresFromSupabase();
+    } else {
+        // LocalStorage 사용 (백업)
+        customStores = loadStoresFromLocalStorage();
+    }
+    
+    // ID 충돌 방지: 기본 데이터와 커스텀 데이터 구분
     const maxDefaultId = defaultStores.length > 0 
         ? Math.max(...defaultStores.map(s => s.id || 0))
         : 0;
     
-    // Custom stores 중 이미 10000 이상인 ID의 최대값 찾기
-    const maxCustomId = customStores.length > 0
-        ? Math.max(...customStores.map(s => (s.id >= 10000 ? s.id : 0)), 0)
-        : 0;
+    // Supabase를 사용하면 ID는 자동 생성되므로 그대로 사용
+    // LocalStorage를 사용하면 10000 이상 ID 사용
+    if (!useSupabase) {
+        const maxCustomId = customStores.length > 0
+            ? Math.max(...customStores.map(s => (s.id >= 10000 ? s.id : 0)), 0)
+            : 0;
+        
+        let nextId = Math.max(maxDefaultId, maxCustomId) + 10000;
+        
+        customStores = customStores.map((store) => {
+            if (store.id >= 10000) {
+                return store;
+            }
+            return {
+                ...store,
+                id: nextId++
+            };
+        });
+    }
     
-    // 시작 ID는 기본 데이터 최대값과 커스텀 데이터 최대값 중 큰 값 + 10000
-    let nextId = Math.max(maxDefaultId, maxCustomId) + 10000;
-    
-    const adjustedCustomStores = customStores.map((store) => {
-        // 이미 10000 이상인 ID는 그대로 사용
-        if (store.id >= 10000) {
-            return store;
-        }
-        // 그렇지 않으면 새 ID 할당
-        return {
-            ...store,
-            id: nextId++
-        };
-    });
-    
-    allStores = [...defaultStores, ...adjustedCustomStores];
+    allStores = [...defaultStores, ...customStores];
     filteredStores = [...allStores];
     
     return allStores;
@@ -645,14 +787,14 @@ function checkPassword(password) {
 }
 
 // 관리자 모드 열기
-function openAdminMode() {
+async function openAdminMode() {
     isAdminMode = true;
     if (passwordModal) {
         passwordModal.classList.remove('active');
     }
     if (adminPanel) {
         adminPanel.classList.remove('hidden');
-        updateAdminStoresList();
+        await updateAdminStoresList();
     }
 }
 
@@ -666,8 +808,15 @@ function closeAdminMode() {
 }
 
 // 관리자 가게 목록 업데이트
-function updateAdminStoresList() {
-    const customStores = loadStoresFromLocalStorage();
+async function updateAdminStoresList() {
+    let customStores = [];
+    
+    if (useSupabase) {
+        customStores = await loadStoresFromSupabase();
+    } else {
+        customStores = loadStoresFromLocalStorage();
+    }
+    
     adminStoresList.innerHTML = '';
     
     if (customStores.length === 0) {
@@ -705,10 +854,49 @@ function addStore() {
 }
 
 // 가게 수정
-function editStore(storeId) {
-    const customStores = loadStoresFromLocalStorage();
-    const store = customStores.find(s => s.id === storeId);
-    if (!store) return;
+async function editStore(storeId) {
+    let store = null;
+    
+    if (useSupabase) {
+        // Supabase에서 가게 정보 가져오기
+        try {
+            const { data, error } = await supabase
+                .from('stores')
+                .select('*')
+                .eq('id', storeId)
+                .single();
+            
+            if (error || !data) {
+                alert('가게 정보를 불러올 수 없습니다.');
+                return;
+            }
+            
+            store = {
+                id: data.id,
+                name: data.name,
+                address: data.address,
+                phone: data.phone || '',
+                lat: data.lat,
+                lng: data.lng,
+                hours: data.hours || { open: '', close: '' },
+                menu: data.menu || [],
+                image: data.image || '',
+                memo: data.memo || ''
+            };
+        } catch (e) {
+            console.error('가게 정보 로드 오류:', e);
+            alert('가게 정보를 불러올 수 없습니다.');
+            return;
+        }
+    } else {
+        // LocalStorage에서 가게 정보 가져오기
+        const customStores = loadStoresFromLocalStorage();
+        store = customStores.find(s => s.id === storeId);
+        if (!store) {
+            alert('가게를 찾을 수 없습니다.');
+            return;
+        }
+    }
     
     document.getElementById('storeEditTitle').textContent = '가게 수정';
     document.getElementById('editStoreId').value = store.id;
@@ -734,46 +922,68 @@ function editStore(storeId) {
 }
 
 // 가게 삭제
-function deleteStore(storeId) {
+async function deleteStore(storeId) {
     if (!confirm('정말 이 가게를 삭제하시겠습니까?')) return;
     
-    const customStores = loadStoresFromLocalStorage();
-    const filtered = customStores.filter(s => s.id !== storeId);
+    let success = false;
     
-    if (saveStoresToLocalStorage(filtered)) {
-        loadAllStores();
+    if (useSupabase) {
+        success = await deleteStoreFromSupabase(storeId);
+    } else {
+        const customStores = loadStoresFromLocalStorage();
+        const filtered = customStores.filter(s => s.id !== storeId);
+        success = saveStoresToLocalStorage(filtered);
+    }
+    
+    if (success) {
+        await loadAllStores();
         displayStoresOnMap();
         updateStoreList();
-        updateAdminStoresList();
+        await updateAdminStoresList();
         alert('가게가 삭제되었습니다.');
     }
 }
 
 // 가게 저장
-function saveStore(storeData) {
-    const customStores = loadStoresFromLocalStorage();
+async function saveStore(storeData) {
     const storeId = parseInt(document.getElementById('editStoreId').value);
+    let success = false;
     
-    if (storeId && storeId > 0) {
-        // 수정
-        const index = customStores.findIndex(s => s.id === storeId);
-        if (index !== -1) {
-            customStores[index] = storeData;
+    if (useSupabase) {
+        if (storeId && storeId > 0) {
+            // 수정
+            success = await updateStoreInSupabase(storeId, storeData);
+        } else {
+            // 추가
+            success = await saveStoreToSupabase(storeData);
         }
     } else {
-        // 추가
-        const maxId = customStores.length > 0 
-            ? Math.max(...customStores.map(s => (s.id >= 10000 ? s.id : 0)), 10000)
-            : 10000;
-        storeData.id = maxId + 1;
-        customStores.push(storeData);
+        // LocalStorage 사용
+        const customStores = loadStoresFromLocalStorage();
+        
+        if (storeId && storeId > 0) {
+            // 수정
+            const index = customStores.findIndex(s => s.id === storeId);
+            if (index !== -1) {
+                customStores[index] = storeData;
+            }
+        } else {
+            // 추가
+            const maxId = customStores.length > 0 
+                ? Math.max(...customStores.map(s => (s.id >= 10000 ? s.id : 0)), 10000)
+                : 10000;
+            storeData.id = maxId + 1;
+            customStores.push(storeData);
+        }
+        
+        success = saveStoresToLocalStorage(customStores);
     }
     
-    if (saveStoresToLocalStorage(customStores)) {
-        loadAllStores();
+    if (success) {
+        await loadAllStores();
         displayStoresOnMap();
         updateStoreList();
-        updateAdminStoresList();
+        await updateAdminStoresList();
         storeEditModal.classList.remove('active');
         alert(storeId ? '가게가 수정되었습니다.' : '가게가 추가되었습니다.');
     }
@@ -830,8 +1040,15 @@ function addMenuItem(name = '', price = 0) {
 }
 
 // JSON 다운로드
-function exportData() {
-    const customStores = loadStoresFromLocalStorage();
+async function exportData() {
+    let customStores = [];
+    
+    if (useSupabase) {
+        customStores = await loadStoresFromSupabase();
+    } else {
+        customStores = loadStoresFromLocalStorage();
+    }
+    
     const dataStr = JSON.stringify(customStores, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -968,21 +1185,34 @@ if (btnImportData) {
 }
 
 if (fileInput) {
-    fileInput.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
                 if (Array.isArray(data)) {
                     if (confirm(`${data.length}개의 가게를 가져오시겠습니까?`)) {
-                        saveStoresToLocalStorage(data);
-                        loadAllStores();
+                        if (useSupabase) {
+                            // Supabase에 일괄 추가
+                            const { error } = await supabase
+                                .from('stores')
+                                .insert(data);
+                            
+                            if (error) {
+                                alert('데이터 가져오기 실패: ' + error.message);
+                                return;
+                            }
+                        } else {
+                            saveStoresToLocalStorage(data);
+                        }
+                        
+                        await loadAllStores();
                         displayStoresOnMap();
                         updateStoreList();
-                        updateAdminStoresList();
+                        await updateAdminStoresList();
                         alert('데이터를 가져왔습니다.');
                     }
                 } else {
@@ -1068,10 +1298,43 @@ if (btnAddMenu) {
     btnAddMenu.addEventListener('click', () => addMenuItem());
 }
 
+// Supabase 실시간 구독 설정
+function setupSupabaseRealtime() {
+    if (!useSupabase || !supabase) return;
+    
+    // stores 테이블 변경 감지
+    supabase
+        .channel('stores-changes')
+        .on('postgres_changes', 
+            { 
+                event: '*',  // INSERT, UPDATE, DELETE 모두 감지
+                schema: 'public', 
+                table: 'stores' 
+            },
+            async (payload) => {
+                console.log('가게 데이터 변경 감지:', payload);
+                // 데이터 다시 로드
+                await loadAllStores();
+                displayStoresOnMap();
+                updateStoreList();
+                if (isAdminMode) {
+                    await updateAdminStoresList();
+                }
+            }
+        )
+        .subscribe();
+}
+
 // 페이지 로드 시 초기화
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
     // 데이터 로드
-    loadAllStores();
+    await loadAllStores();
+    
+    // Supabase 실시간 구독 설정
+    if (useSupabase) {
+        setupSupabaseRealtime();
+        console.log('✅ Supabase 실시간 구독 활성화');
+    }
     
     setTimeout(() => {
         if (typeof naver !== 'undefined' && naver.maps) {
